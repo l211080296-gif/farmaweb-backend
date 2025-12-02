@@ -56,7 +56,16 @@
                             </a>
                             
                             <div class="login-button-container" data-context="desktop">
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <a href="#" data-page="login" class="login-button">
+                                        <i data-lucide="user"></i>
+                                        <span>Ingresar</span>
+                                    </a>
+                                    <a href="#" data-page="registro" class="button button-primary" style="padding: 0.5rem 1rem; font-size: 0.875rem; text-decoration: none;">
+                                        Crear Cuenta
+                                    </a>
                                 </div>
+                            </div>
                             
                             <button class="icon-button mobile-menu-button">
                                 <i data-lucide="menu"></i>
@@ -80,7 +89,9 @@
                 
                 <hr class="login-separator"> 
                 <div class="login-button-container" data-context="mobile">
-                    </div>
+                    <a href="#" data-page="login" class="nav-link">Iniciar Sesión</a>
+                    <a href="#" data-page="registro" class="nav-link">Registrarse</a>
+                </div>
             </nav>
         </header>
         

@@ -52,11 +52,10 @@ def register():
     if User.query.filter_by(email=data['email']).first():
         return jsonify({'success': False, 'message': 'El correo ya está registrado'}), 400
     
-    # Encriptamos la contraseña por seguridad (Buenas prácticas)
-    # Nota: Si usas las contraseñas planas "123" del ejemplo anterior, actualiza esto
-    # Para mantener compatibilidad con tu ejemplo simple, guardamos texto plano,
-    # pero te RECOMIENDO usar generate_password_hash(data['password'])
-    new_user = User(name=data['name'], email=data['email'], password=data['password'], role='user')
+    # --- CAMBIO SEGURIDAD: Encriptar contraseña ---
+    hashed_password = generate_password_hash(data['password'])
+    
+    new_user = User(name=data['name'], email=data['email'], password=hashed_password, role='user')
     
     db.session.add(new_user)
     db.session.commit()
@@ -77,9 +76,13 @@ def register():
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
-    user = User.query.filter_by(email=data['email'], password=data['password']).first()
-    if user:
+    
+    # --- CAMBIO SEGURIDAD: Buscar por email y verificar hash ---
+    user = User.query.filter_by(email=data['email']).first()
+    
+    if user and check_password_hash(user.password, data['password']):
         return jsonify({'success': True, 'user': {'name': user.name, 'email': user.email, 'role': user.role}})
+        
     return jsonify({'success': False, 'message': 'Credenciales incorrectas'}), 401
 
 # 3. Actualizar Perfil (NUEVO)
@@ -134,7 +137,8 @@ def reset_password_page(token):
         new_password = request.form.get('password')
         user = User.query.filter_by(email=email).first()
         if user:
-            user.password = new_password # Recuerda encriptar en producción real
+            # --- CAMBIO SEGURIDAD: Encriptar también al recuperar ---
+            user.password = generate_password_hash(new_password)
             db.session.commit()
             return "<h1>Contraseña actualizada. Ya puedes iniciar sesión en la app.</h1>"
     
