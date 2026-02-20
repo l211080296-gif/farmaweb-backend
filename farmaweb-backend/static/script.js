@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- CARGA INICIAL ---
     updateCartBadge();
     updateLoginButton();
+    updateCartVisibility();
     loadPage('inicio');
 });
 
@@ -136,5 +137,27 @@ function handleFormSubmit(event) {
         clearCart();
         loadPage('orden-completa');
         return;
+    }
+}
+// Al final de script.js, después de todo lo demás
+function updateCartVisibility() {
+    const cartButton = document.getElementById('cartButton');
+    if (!cartButton) return; // Seguridad si no está en la página actual
+
+    const user = currentUser; // Viene de modules/state.js
+
+    if (!user) {
+        // Sin sesión → carrito visible
+        cartButton.style.display = 'inline-flex';
+        return;
+    }
+
+    // Con sesión → decidir por rol
+    if (user.rol === 'admin' || user.role === 'admin' || user.isAdmin === true) {
+        // Es admin → ocultar carrito
+        cartButton.style.display = 'none';
+    } else {
+        // Usuario normal → mostrar carrito
+        cartButton.style.display = 'inline-flex';
     }
 }
