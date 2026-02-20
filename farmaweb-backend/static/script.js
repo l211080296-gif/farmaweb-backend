@@ -1,7 +1,7 @@
 // script.js (Archivo principal)
-// VERSIÓN CORREGIDA - AHORA INCLUYE EL MENÚ MÓVIL
+// VERSIÓN CORREGIDA Y MEJORADA - OCULTAR CARRITO PARA ADMIN
 
-import { loadPage, toggleMobileMenu, closeMobileMenu } from './modules/router.js'; // <-- AÑADIDAS importaciones de menú
+import { loadPage, toggleMobileMenu, closeMobileMenu } from './modules/router.js';
 import { updateLoginButton, handleLogout, handleLogin } from './modules/auth.js';
 import { updateCartBadge, addToCart, updateCartItemQuantity, removeFromCart, clearCart } from './modules/cart.js';
 import { handleSearch } from './modules/pages/catalog.js';
@@ -20,52 +20,103 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.addEventListener('submit', handleFormSubmit);
 
     // --- LISTENERS ESTÁTICOS ---
-    // (El botón del menú ahora se maneja en handleBodyClick)
     document.getElementById('desktop-search-input')?.addEventListener('input', handleSearch);
     document.getElementById('mobile-search-input')?.addEventListener('input', handleSearch);
 
     // --- CARGA INICIAL ---
     updateCartBadge();
     updateLoginButton();
-    updateCartVisibility();
+    updateCartVisibility();   // ← ya estaba, pero ahora la función es más depurable
     loadPage('inicio');
 });
 
-// --- 2. MANEJADOR DE CLICS GLOBAL (Delegación) ---
-// --- 2. MANEJADOR DE CLICS GLOBAL (Delegación) ---
-function handleBodyClick(event) {
-    const target = event.target; // El elemento exacto donde se hizo clic
-
-    // Manejador del botón de menú móvil
-    const menuButton = target.closest('.mobile-menu-button');
-    if (menuButton) {
-        event.preventDefault();
-        toggleMobileMenu(); 
+// Función mejorada para ocultar/mostrar carrito según rol
+function updateCartVisibility() {
+    const cartButton = document.getElementById('cartButton');
+    if (!cartButton) {
+        console.warn('[CartVisibility] No se encontró elemento con id="cartButton" → revisa index.html');
         return;
     }
 
-    // Manejador para enlaces de navegación SPA
+    console.log('[CartVisibility] Ejecutando... currentUser =', currentUser);
+
+    if (!currentUser) {
+        console.log('[CartVisibility] No hay sesión → MOSTRAR carrito');
+        cartButton.style.display = 'inline-flex';
+        return;
+    }
+
+    // Ajusta esta condición según lo que realmente tenga tu objeto currentUser
+    // Abre F12 → Console y mira qué imprime arriba para saber qué propiedad usar
+    const esAdmin = 
+        currentUser.rol === 'admin' ||
+        currentUser.role === 'admin' ||
+        currentUser.tipo === 'administrador' ||
+        currentUser.isAdmin === true ||
+        currentUser.username?.toLowerCase() === 'admin' || 
+        currentUser.username?.toLowerCase().includes('admin');
+
+    if (esAdmin) {
+        console.log('[CartVisibility] USUARIO ES ADMIN → OCULTANDO carrito');
+        cartButton.style.display = 'none';
+    } else {
+        console.log('[CartVisibility] Usuario cliente/normal → MOSTRANDO carrito');
+        cartButton.style.display = 'inline-flex';
+    }
+}
+
+// Workaround para actualizar después de login/logout (ya que están en auth.js)
+const originalSetItem = localStorage.setItem;
+localStorage.setItem = function(key, value) {
+    originalSetItem.apply(this, arguments);
+    if (key === 'currentUser') {
+        console.log('[Storage] currentUser actualizado → refrescando visibilidad carrito');
+        updateCartVisibility();
+    }
+};
+
+const originalRemoveItem = localStorage.removeItem;
+localStorage.removeItem = function(key) {
+    originalRemoveItem.apply(this, arguments);
+    if (key === 'currentUser') {
+        console.log('[Storage] Sesión cerrada → refrescando visibilidad carrito');
+        updateCartVisibility();
+    }
+};
+
+// --- 2. MANEJADOR DE CLICS GLOBAL (Delegación) ---
+function handleBodyClick(event) {
+    const target = event.target;
+
+    // Toggle menú móvil
+    if (target.closest('.mobile-menu-button')) {
+        toggleMobileMenu();
+        return;
+    }
+
+    // Cerrar menú móvil al clic fuera
+    if (!target.closest('.mobile-menu') && !target.closest('.mobile-menu-button')) {
+        closeMobileMenu();
+    }
+
+    // Navegación SPA
     const pageLink = target.closest('[data-page]');
     if (pageLink) {
         event.preventDefault();
         
-        // --- LÓGICA NUEVA PARA CATEGORÍAS ---
         const category = pageLink.getAttribute('data-category');
         if (category) {
-            // Si clicaste en una tarjeta de categoría, guardamos la intención
             localStorage.setItem('pending_category', category);
         } else if (pageLink.getAttribute('data-page') === 'catalogo') {
-            // Si clicaste en "Catálogo" del menú normal, limpiamos filtros
             localStorage.removeItem('pending_category');
         }
-        // ------------------------------------
-
+        
         loadPage(pageLink.getAttribute('data-page'));
-        closeMobileMenu(); 
+        closeMobileMenu();
         return;
     }
 
-    // Manejador para "Añadir al Carrito"
+    // Añadir al carrito
     const addToCartButton = target.closest('.add-to-cart-btn');
     if (addToCartButton) {
         event.preventDefault();
@@ -73,14 +124,13 @@ function handleBodyClick(event) {
         return;
     }
 
-    // Manejadores para botones del carrito
-    const cartButton = target.closest('.quantity-btn, .remove-item-btn');
-    if (cartButton) {
+    // Botones dentro del carrito (+, -, eliminar)
+    const cartActionButton = target.closest('.quantity-btn, .remove-item-btn');
+    if (cartActionButton) {
         event.preventDefault();
-        const productId = cartButton.getAttribute('data-product-id');
-        const action = cartButton.getAttribute('data-action');
+        const productId = cartActionButton.getAttribute('data-product-id');
+        const action = cartActionButton.getAttribute('data-action');
         const item = cart.find(i => i.id === productId);
-
         if (item) {
             if (action === 'increase') updateCartItemQuantity(productId, item.quantity + 1);
             if (action === 'decrease') updateCartItemQuantity(productId, item.quantity - 1);
@@ -88,28 +138,25 @@ function handleBodyClick(event) {
         }
         return;
     }
-    
-    // Manejador para botón de Logout
-    const logoutButton = target.closest('.logout-button');
-    if (logoutButton) {
+
+    // Logout
+    if (target.closest('.logout-button')) {
         event.preventDefault();
         handleLogout();
         return;
     }
 }
 
-// --- 3. MANEJADOR DE SUBMITS GLOBAL (Delegación) ---
+// --- 3. MANEJADOR DE SUBMITS GLOBAL ---
 function handleFormSubmit(event) {
-    const form = event.target; 
+    const form = event.target;
 
-    // Manejador para formulario de Login
     if (form.id === 'login-form') {
         event.preventDefault();
         handleLogin(event);
         return;
     }
 
-    // Manejador para formulario de Contacto
     if (form.id === 'contact-form') {
         event.preventDefault();
         alert('Mensaje enviado con éxito. (Simulación)');
@@ -117,7 +164,6 @@ function handleFormSubmit(event) {
         return;
     }
 
-    // Manejador para formulario de Info Personal (Mi Cuenta)
     if (form.id === 'personal-info-form') {
         event.preventDefault();
         const newNameInput = form.querySelector('#acc-name');
@@ -130,34 +176,11 @@ function handleFormSubmit(event) {
         return;
     }
 
-    // Manejador para formulario de Pago
     if (form.id === 'payment-form') {
         event.preventDefault();
         alert('¡Pedido realizado con éxito! (Simulación)');
         clearCart();
         loadPage('orden-completa');
         return;
-    }
-}
-// Al final de script.js, después de todo lo demás
-function updateCartVisibility() {
-    const cartButton = document.getElementById('cartButton');
-    if (!cartButton) return; // Seguridad si no está en la página actual
-
-    const user = currentUser; // Viene de modules/state.js
-
-    if (!user) {
-        // Sin sesión → carrito visible
-        cartButton.style.display = 'inline-flex';
-        return;
-    }
-
-    // Con sesión → decidir por rol
-    if (user.rol === 'admin' || user.role === 'admin' || user.isAdmin === true) {
-        // Es admin → ocultar carrito
-        cartButton.style.display = 'none';
-    } else {
-        // Usuario normal → mostrar carrito
-        cartButton.style.display = 'inline-flex';
     }
 }
